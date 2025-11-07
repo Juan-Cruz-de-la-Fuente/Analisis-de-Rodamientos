@@ -656,6 +656,35 @@ elif st.session_state.seccion_actual == 'analisis':
                 df_custom = pd.read_excel(uploaded_file)
                 st.success("✅ Archivo cargado correctamente")
                 st.dataframe(df_custom.head(), use_container_width=True)
+
+                # --- Validar columnas esperadas ---
+                columnas_necesarias = {"tipo", "d", "D", "B", "C", "C0", "designation"}
+                if not columnas_necesarias.issubset(df_custom.columns):
+                    st.error(f"❌ El archivo debe incluir al menos las columnas: {', '.join(columnas_necesarias)}")
+                else:
+                    # --- Rellenar columnas faltantes con NaN o valores por defecto ---
+                    for col in ["e", "Y", "Y0", "serie", "f0"]:
+                        if col not in df_custom.columns:
+                            df_custom[col] = np.nan
+
+                    # --- Asegurar tipos numéricos ---
+                    for col in ["d", "D", "B", "C", "C0", "e", "Y", "Y0", "serie", "f0"]:
+                        df_custom[col] = pd.to_numeric(df_custom[col], errors="coerce")
+
+                    # --- Asignar IDs nuevos y concatenar ---
+                    max_id = df_rodamientos["ID"].max() if "ID" in df_rodamientos.columns else 0
+                    df_custom["ID"] = range(max_id + 1, max_id + 1 + len(df_custom))
+
+                    # --- Rellenar NaN por 0 donde corresponde ---
+                    df_custom["serie"] = df_custom["serie"].fillna(0)
+                    df_custom["f0"] = df_custom["f0"].fillna(0)
+
+                    # --- Combinar con la base existente ---
+                    df_rodamientos = pd.concat([df_rodamientos, df_custom], ignore_index=True)
+
+                    st.success(f"✅ Se agregaron {len(df_custom)} nuevos rodamientos a la base existente.")
+                    st.dataframe(df_rodamientos.tail(len(df_custom)), use_container_width=True)
+
             except Exception as e:
                 st.error(f"❌ Error al cargar archivo: {e}")
     
@@ -933,4 +962,5 @@ if total_combinaciones_global > 0:
                     st.write(f"**Designación:** {row_sel['Designación_B']}")
                     st.write(f"**Apoyo Fijo (Axial):** {'Sí' if row_sel['Apoyo_Fijo'] == 'B' else 'No'}")
                     st.write(f"**Vida útil:** {row_sel['Vida_B (h)']} horas")
+
                     st.write(f"**Factor de seguridad:** {row_sel['FS_B']}")
